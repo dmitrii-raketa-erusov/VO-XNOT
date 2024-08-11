@@ -6,24 +6,25 @@
 
 
 # Конвертация речи
-
-    # Указываем параметры окружения для тренировки(пути, как логировать)
-    environment = VOXNOTModelTrainingEnvironment('путь для хранения лучших моделей', 0, 'путь для сохранения chekpoints', 5000, True, 500)
     # Гипер-параметры модели
     model_hp = VOXNOTModelHyperParams(layers = 4, layer_size = 2048)
-    # Конвертация звуковых файлов с речью на обученных моделях
+    # Класс для работы с моделями, указываем параметр prod_mode = True - что это режим предсказания
     vx_prod = VOXNOT(device, 'VOXNOTMLPModel', model_hp, True)
-    
     # Получение речи 
-    vx_prod.make_conversation('Папка или путь к файлу с аудио для конвертации', 'Папка или путь к модели/коэффициентам', 'Папка куда положить результат')
+    vx_prod.make_conversation(
+            'Папка или путь к файлу с аудио для конвертации', 
+            'Папка или путь к модели/коэффициентам', 
+            'Папка куда положить результат')
+
 
 # Тренировка моделей
     # Указываем параметры окружения для тренировки(пути, как логировать)
-    environment = VOXNOTModelTrainingEnvironment('путь для хранения лучших моделей', 0, 'путь для сохранения chekpoints', 5000, True, 500)
+    environment = VOXNOTModelTrainingEnvironment('путь для хранения лучших моделей', 0, 
+                'путь для сохранения chekpoints', 5000, True, 500)
     
     # Гипер-параметры модели
     model_hp = VOXNOTModelHyperParams(layers = 4, layer_size = 2048)
-
+    # Класс для работы с моделями, указываем параметр prod_mode = False - что это режим тренировки
     vx = VOXNOT(device, 'VOXNOTMLPModel', model_hp, False)
     
     # Тренировки с разными W
