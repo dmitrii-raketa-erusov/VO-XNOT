@@ -1,3 +1,10 @@
+﻿# --------------------------------------------------------
+# VOXNOT(other name XNOT-VC): 
+# Github source: https://github.com/dmitrii-raketa-erusov/XNOT-VC
+# Copyright (c) 2024 Dmitrii Erusov
+# Licensed under The MIT License [see LICENSE for details]
+# --------------------------------------------------------
+
 import os
 
 

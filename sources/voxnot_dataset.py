@@ -1,3 +1,12 @@
+﻿# --------------------------------------------------------
+# VOXNOT(other name XNOT-VC): 
+# Github source: https://github.com/dmitrii-raketa-erusov/XNOT-VC
+# Copyright (c) 2024 Dmitrii Erusov
+# Licensed under The MIT License [see LICENSE for details]
+# Based on code bases
+# https://github.com/pytorch/
+# --------------------------------------------------------
+
 import gc
 import numpy as np
 import torch
@@ -22,7 +31,7 @@ class Sampler:
 
 class LoaderSampler(Sampler):
     """
-    Loader
+    Loader class, as in PyTorch example
     """
     def __init__(self, loader, device):
         super(LoaderSampler, self).__init__(device)
@@ -48,7 +57,7 @@ class VOXNOTDataset:
     tensor: torch.Tensor
     def __init__(self, tensor: str | torch.Tensor | os.PathLike, device):
         """
-        tensor - Path to serialized Tensor with data or Tensor with features
+        tensor - Path to serialized Tensor with data or Tensor with audio-features
         """
         if (type(tensor) in [torch.Tensor]):
             self.tensor = tensor
@@ -60,7 +69,7 @@ class VOXNOTDataset:
 
     def concat(self, dataset):
         """
-        Concat 2 datasets in one
+        Concat 2 datasets with audio-feature in one, if you dont want to use ConcatDataset
         """
         self.tensor = torch.concat([self.tensor, dataset.tensor], dim = 0).to(self.device)
 

@@ -1,28 +1,48 @@
+п»ї# --------------------------------------------------------
+# VOXNOT(other name XNOT-VC): 
+# Github source: https://github.com/dmitrii-raketa-erusov/XNOT-VC
+# Copyright (c) 2024 Dmitrii Erusov
+# Licensed under The MIT License [see LICENSE for details]
+# Based on code bases
+# https://github.com/pytorch/
+# https://github.com/bshall/knn-vc/
+# --------------------------------------------------------
+
 import gc
 import torch
 import os
+import torchaudio
 
 from sources.audio_helper import VOXNOTFeaturesHelper
 
-# Класс для подготовки данных для тренировки/валидации/тестирования
-# При создании принимает параметры
-# inputDir - папка с исходными аудио-файлами
-# outputDir - папка куда будут записываться датасеты с фичами
-# augmentation_effects - матрица эффектов для аугментации, список из матрицы эффектов виде [postfix, [effects]]
-# postfix - что добавлять к оригинальному имени файла
-# матрица эффектов может состоять из
-# [effects] = [
-#   ["lowpass", "-1", "300"], # apply single-pole lowpass filter
-#   ["speed", "0.8"],  # reduce the speed
-#   ["reverb", "-w"],  # Reverbration gives some dramatic feeling
-# ]
-# augmentation_count - сколько случайных преобразований выполнять
-# keepConvertedAudio - указывает нужно ли сохранять помимо датасетов, еще подготовленные аудио
 class VOXNOTDatasetPreparationTools:
-    OUT_WAV_CHANNEL = 1
-    OUT_WAV_ENCODING = 'PCM_S'
+    """
+    РљР»Р°СЃСЃ РґР»СЏ РїРѕРґРіРѕС‚РѕРІРєРё РґР°С‚Р°СЃРµС‚РѕРІ РґР»СЏ С‚СЂРµРЅРёСЂРѕРІРєРё/РІР°Р»РёРґР°С†РёРё/С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ
+    
+    Р‘РµСЂРµС‚ РІС…РѕРґРЅС‹Рµ audio Р»СЋР±С‹С… С„РѕСЂРјР°С‚РѕРІ, РїСЂРµРѕР±СЂР°Р·РѕРІС‹РІР°РµС‚ РёС… РІ С„Р°Р№Р»С‹ РґР»СЏ РёР·РІР»РµС‡РµРЅРёСЏ audio-features(wav, 16k Р±РёС‚СЂРµР№С‚, РјРѕРЅРѕ, РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊСЋ РґРѕ 150 СЃРµРє.).
+    Р’ СЃР»СѓС‡Р°Рµ, РµСЃР»Рё РёСЃС…РѕРґРЅС‹Р№ С„Р°Р№Р» Р±РѕР»РµРµ С‡РµРј 150 СЃРµРє, РЅР°СЂРµР·Р°РµС‚ РµРіРѕ РЅР° РєСѓСЃРєРё РїРѕ 150 СЃРµРє. РјР°РєСЃРёРјСѓРј
+    Р”Р°Р»РµРµ, РёР· СЌС‚РёС… wav С„Р°Р№Р»РѕРІ РёР·РІР»РµРєР°СЋС‚СЃСЏ audio-features СЃ РїРѕРјРѕС‰СЊСЋ WalLM, Р° РїРѕР»СѓС‡Р°РµРјС‹Рµ Tensors СЃРµСЂРёР°Р»РёР·СѓСЋС‚СЃСЏ РІ С„Р°Р№Р»С‹, РєРѕС‚РѕСЂС‹Рµ Рё СЏРІР»СЏСЋС‚СЃСЏ dataset'Р°РјРё РґР»СЏ 
+    Р°Р»РіРѕСЂРёС‚РјР° РѕР±СѓС‡РµРЅРёСЏ
+    """
+    OUT_WAV_CHANNEL = 1 # РЎРєРѕР»СЊРєРѕ РєР°РЅР°Р»РѕРІ РІ РІС‹С…РѕРґРЅРѕРј С„Р°Р№Р»Рµ
+    OUT_WAV_ENCODING = 'PCM_S' # Р¤РѕСЂРјР°С‚ wav
 
     def __init__(self, input_dir:str | os.PathLike, output_dir:str | os.PathLike, augmentation = None, keep_converted_audio:bool = False, device = None, vad_trigger_level = 0):
+        """
+        inputDir - РїР°РїРєР° СЃ РёСЃС…РѕРґРЅС‹РјРё Р°СѓРґРёРѕ-С„Р°Р№Р»Р°РјРё
+        outputDir - РїР°РїРєР° РєСѓРґР° Р±СѓРґСѓС‚ Р·Р°РїРёСЃС‹РІР°С‚СЊСЃСЏ РґР°С‚Р°СЃРµС‚С‹ СЃ audio-features
+        augmentation - РјР°С‚СЂРёС†Р° СЌС„С„РµРєС‚РѕРІ РґР»СЏ Р°СѓРіРјРµРЅС‚Р°С†РёРё, СЃРїРёСЃРѕРє РёР· РјР°С‚СЂРёС†С‹ СЌС„С„РµРєС‚РѕРІ РІРёРґРµ [postfix, [effects]]
+        postfix - С‡С‚Рѕ РґРѕР±Р°РІР»СЏС‚СЊ Рє РѕСЂРёРіРёРЅР°Р»СЊРЅРѕРјСѓ РёРјРµРЅРё С„Р°Р№Р»Р°
+        РјР°С‚СЂРёС†Р° СЌС„С„РµРєС‚РѕРІ РјРѕР¶РµС‚ СЃРѕСЃС‚РѕСЏС‚СЊ РёР·
+        [effects] = [
+          ["lowpass", "-1", "300"], # apply single-pole lowpass filter
+          ["speed", "0.8"],  # reduce the speed
+          ["reverb", "-w"],  # Reverbration gives some dramatic feeling
+        ]
+        augmentation_count - СЃРєРѕР»СЊРєРѕ СЃР»СѓС‡Р°Р№РЅС‹С… РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёР№ РІС‹РїРѕР»РЅСЏС‚СЊ
+        keepConvertedAudio - СѓРєР°Р·С‹РІР°РµС‚ РЅСѓР¶РЅРѕ Р»Рё СЃРѕС…СЂР°РЅСЏС‚СЊ, РїРѕР»СѓС‡РµРЅРЅС‹Рµ РёР· РёСЃС…РѕРґРЅРѕРіРѕ Р°СѓРґРёРѕ, РїСЂРѕРјРµР¶СѓС‚РѕС‡РЅС‹Рµ Р°СѓРґРёРѕ С„Р°Р№Р»С‹, РёР· РєРѕС‚РѕСЂС‹С… РІС‹С‚СЏРіРёРІР°Р»РёСЃСЊ audio-features 
+        vad_trigger_level - СѓСЂРѕРІРµРЅСЊ РѕР±СЂРµР·РєРё РїРѕ РіСЂРѕРјРєРѕСЃС‚Рё, РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 0, Р·РІСѓРєРё Р»СЋР±РѕР№ РіСЂРѕРјРєРѕСЃС‚Рё 
+        """
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.augmentation = augmentation
@@ -30,8 +50,11 @@ class VOXNOTDatasetPreparationTools:
         self.device = device
         self.helper = None
         self.vad_trigger_level = vad_trigger_level
-    # Запускает подготовку данных
+    
     def prepare(self):
+        """
+        Р—Р°РїСѓСЃРєР°РµС‚ РїРѕРґРіРѕС‚РѕРІРєСѓ dataset'РѕРІ
+        """
         if self.helper == None:
             self.helper = VOXNOTFeaturesHelper(self.device)
 
@@ -41,6 +64,9 @@ class VOXNOTDatasetPreparationTools:
                 self._process_file(source_path)
 
     def _split_wav(self, wav, wav_rate, interval):
+      """
+      РњРµС‚РѕРґ РЅР°СЂРµР·РєРё wav РЅР° РЅРµСЃРєРѕР»СЊРєРѕ С„Р°Р№Р»РѕРІ С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕР№ РјР°РєСЃРёРјР°Р»СЊРЅРѕР№ РґР»РёРЅС‹
+      """
       min_clip_len = interval * wav_rate
       wave_len = wav.shape[1]
 
@@ -52,7 +78,7 @@ class VOXNOTDatasetPreparationTools:
 
     def _convert_file(self, path):
         """
-        Внутренний метод по обработке файла в wav 1 канал(моно), 16 кбит
+        Р’РЅСѓС‚СЂРµРЅРЅРёР№ РјРµС‚РѕРґ РїРѕ РѕР±СЂР°Р±РѕС‚РєРµ РёСЃС…РѕРґРЅРѕРіРѕ С„Р°Р№Р»Р° Р»СЋР±РѕРіРѕ С„РѕСЂРјР°С‚Р°, РІ wav 1 РєР°РЅР°Р»(РјРѕРЅРѕ), 16 РєР±РёС‚
         """
         path_converted = os.path.join(self.output_dir, os.path.basename(path)) + '.wav'
         waveform, sample_rate = torchaudio.load(path)
@@ -78,19 +104,20 @@ class VOXNOTDatasetPreparationTools:
 
     def _generate_augm_files(self, path):
         """
-        Внутренний метод по генерации аугментированных файлов в wav 1 канал(моно), 16 кбит
+        Р’РЅСѓС‚СЂРµРЅРЅРёР№ РјРµС‚РѕРґ РїРѕ РіРµРЅРµСЂР°С†РёРё Р°СѓРіРјРµРЅС‚РёСЂРѕРІР°РЅРЅС‹С… С„Р°Р№Р»РѕРІ РІ wav 1 РєР°РЅР°Р»(РјРѕРЅРѕ), 16 РєР±РёС‚
+        РІ РіРёС‚ РЅРµ РІС‹Р»РѕР¶РµРЅ, С‚РµСЃС‚РёСЂСѓРµС‚СЃСЏ...
         """
 
         return []
 
     def _process_file(self, path):
         """
-        Внутренний метод по обработке одного файла
-        делает
-        конвертирует файл в wav, 1 канал(моно), 16 кбит
-        если указаны эффекты, то генерирует дополнительные файлы в wav, 1 канал(моно), 16 кбит
-        с помощью WalLM извлекает features
-        сохраняет features в файле
+        Р’РЅСѓС‚СЂРµРЅРЅРёР№ РјРµС‚РѕРґ РїРѕ РѕР±СЂР°Р±РѕС‚РєРµ РѕРґРЅРѕРіРѕ С„Р°Р№Р»Р°
+        
+        РєРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ С„Р°Р№Р» РІ wav, 1 РєР°РЅР°Р»(РјРѕРЅРѕ), 16 РєР±РёС‚
+        РµСЃР»Рё СѓРєР°Р·Р°РЅС‹ СЌС„С„РµРєС‚С‹ Р°СѓРіРјРµРЅС‚Р°С†РёРё, С‚Рѕ РіРµРЅРµСЂРёСЂСѓРµС‚ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рµ С„Р°Р№Р»С‹ РІ wav, 1 РєР°РЅР°Р»(РјРѕРЅРѕ), 16 РєР±РёС‚ РІ СЃР»СѓС‡Р°Р№РЅРѕРј РїРѕСЂСЏРґРєРµ
+        СЃ РїРѕРјРѕС‰СЊСЋ WalLM РёР·РІР»РµРєР°РµС‚ audio-features
+        СЃРµСЂРёР°Р»РёР·СѓРµС‚ Tensor СЃ audifeatures РІ С„Р°Р№Р»
         """
         gc.collect()
         torch.cuda.empty_cache()

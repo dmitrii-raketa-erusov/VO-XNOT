@@ -1,5 +1,15 @@
+п»ї# --------------------------------------------------------
+# VOXNOT(other name XNOT-VC): 
+# Github source: https://github.com/dmitrii-raketa-erusov/XNOT-VC
+# Copyright (c) 2024 Dmitrii Erusov
+# Licensed under The MIT License [see LICENSE for details]
+# Based on code bases
+# https://github.com/pytorch/
+# --------------------------------------------------------
+
 import gc
 import os
+import shutil
 import torch
 
 from sources.params import VOXNOTModelHyperParams, VOXNOTModelTrainingEnvironment, VOXNOTModelTrainingHyperParams
@@ -7,19 +17,17 @@ from sources.base_model import VOXNOTBaseModel
 from sources.data_preparation import VOXNOTDatasetPreparationTools
 from sources.voxnot_dataset import VOXNOTDataset
 from sources.audio_helper import VOXNOTFeaturesHelper
-
-import shutil
+from datasets import con
+from torch.utils.data import ConcatDataset
 
 class VOXNOT:
     """
-    Класс для работы с алгоритмом. Тренировки моделей, вычисление результатов
-Метод вычисления(файл, модель, выходной файл)
-Метод для работы по папкам(папка с файлами, папка с моделями, выходная папка)
-Нацеливаем папки
-- папка с входным аудиофайлом/файлами
-- папка моделей
-Делает несколько конвертаций в выходной вав по загруженным моделям
-"""
+    РљР»Р°СЃСЃ РїСЂРµРґСЃС‚Р°РІР»СЏСЋС‰РёР№ РІРµСЂС…РЅРµСѓСЂРѕРІРЅРµРІРѕРµ API РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ Р°Р»РіРѕСЂРёС‚РјРѕРј XNOT РІ С‡Р°СЃС‚Рё Р°СѓРґРёРѕ. 
+
+    РџСЂРµРґРѕСЃС‚Р°РІР»СЏРµС‚ РІРµСЂС…РЅРµСѓСЂРѕРІРЅРµРІС‹Рµ РјРµС‚РѕРґС‹ С‚СЂРµРЅРёСЂРѕРІРєРё РјРѕРґРµР»РµР№ СЃ СЂР°Р·РЅС‹РјРё РїР°СЂР°РјРµС‚СЂР°РјРё
+    Рё РјРµС‚РѕРґС‹ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РїРѕСЃС‡РёС‚Р°РЅРЅС‹С… РјРѕРґРµР»РµР№ РґР»СЏ voice-РєРѕРЅРІРµСЂС‚Р°С†РёРё СЂРµР°Р»СЊРЅС‹С… РґР°РЅРЅС‹С… РІ С†РµР»РµРІС‹Рµ РіРѕР»РѕСЃР°
+    
+    """
     model_instance:VOXNOTBaseModel
 
     def _clear_folder(dir):
@@ -34,7 +42,7 @@ class VOXNOT:
                       VOXNOT._clear_folder(file_path)
                       os.rmdir(file_path)
 
-                  print(f'removed {file_path}')
+                  print(f'Clear file {file_path} from dataset directory')
               except Exception as e:
                   print(e)
 
@@ -42,12 +50,6 @@ class VOXNOT:
         self.device = device
         class_object = globals()[model_class_name]
         self.model_instance = class_object(device, hyper_params, prod_mode)
-
-    def clear_mem():
-        gc.collect()
-        torch.cuda.empty_cache()
-        with torch.no_grad():
-          torch.cuda.empty_cache()
 
     def _prepare_dataset(self, delete_last_prepared_data, input_dir, dataset_dir):
         exists_prepared_datasets = False
@@ -73,11 +75,6 @@ class VOXNOT:
 
         datasets = []
 
-#        dataset = VOXNOTDataset([])
-#        for file_ds in glob(os.path.join(dataset_dir, '*.pt')):
-#            dataset.concat(VOXNOTDataset(file_ds))
-#        return dataset
-
         for file_ds in os.listdir(dataset_dir):
           path_file_ds = os.path.join(dataset_dir, file_ds)
           if os.path.isfile(path_file_ds) and os.path.splitext(path_file_ds)[1] == '.pt':
@@ -85,21 +82,33 @@ class VOXNOT:
 
         return ConcatDataset(datasets)
 
+    def clear_mem():
+        """
+        РњРµС‚РѕРґ РґР»СЏ РѕС‡РёСЃС‚РєРё РјСѓСЃРѕСЂР° РІ РїР°РјСЏС‚Рё
+        Р»СѓС‡С€Рµ РІС‹Р·С‹РІР°С‚СЊ РјРµР¶РґСѓ С‚СЂРµРЅРёСЂРѕРІРєР°РјРё РёР»Рё РІС‹С‡РёСЃР»РµРЅРёСЏРјРё        
+        """
+        gc.collect()
+        torch.cuda.empty_cache()
+        with torch.no_grad():
+          torch.cuda.empty_cache()
 
     def train(self, delete_last_prepared_data:bool, input_query_dir:str | os.PathLike, input_reffer_dir:str | os.PathLike,
               temp_dir:str | os.PathLike, output_dir:str | os.PathLike,
               training_hyper_params:VOXNOTModelTrainingHyperParams, training_env:VOXNOTModelTrainingEnvironment,
               training_name:str):
         """
-        Метод тренировки модели
-        delete_last_prepared_data - удалить предыдущие тренировочные датасеты и сделать новые
-        input_query_dir - папка с аудио исходных спикеров
-        input_reffer_dir - папка с аудио целевых спикеров
-        temp_dir - временная директория для работы
-        output_dir - папка для выходных моделей
-        training_hyper_params - гиперпараметры тренировки
-        training_env - параметры окружения 
-        training_name - название модели(будет в выходном файле)
+        РњРµС‚РѕРґ С‚СЂРµРЅРёСЂРѕРІРєРё РјРѕРґРµР»Рё
+        
+        delete_last_prepared_data - РµСЃР»Рё True, С‚Рѕ РїСЂРµРґС‹РґСѓС‰РёРµ С‚СЂРµРЅРёСЂРѕРІРѕС‡РЅС‹Рµ РґР°С‚Р°СЃРµС‚С‹ СЃРґРµР»Р°РЅРЅС‹Рµ РёР· audio-С„Р°Р№Р»РѕРІ Р±СѓРґСѓС‚ СѓРґР°Р»РµРЅС‹, РµСЃР»Рё False, 
+        С‚Рѕ Р±СѓРґСѓС‚ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊСЃСЏ СЃРѕС…СЂР°РЅРµРЅРЅС‹Рµ РІ РєРµС€Рµ. РќСѓР¶РЅРѕ РїРµСЂРµРґР°РІР°С‚СЊ True, РµСЃР»Рё С‚СЂРµРЅРёСЂРѕРІРѕС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ РјРµРЅСЏСЋС‚СЃСЏ(С„Р°Р№Р»С‹ РѕС‚Р»РёС‡Р°СЋС‚СЃСЏ РѕС‚ С‚РµС…, РєРѕС‚РѕСЂС‹Рµ Р±С‹Р»Рё СЂР°РЅРµРµ РґР»СЏ С‚СЂРµРЅРёСЂРѕРІРєРё)
+        
+        input_query_dir - РїР°РїРєР° СЃ Р°СѓРґРёРѕ РёСЃС…РѕРґРЅС‹С… СЃРїРёРєРµСЂРѕРІ(Р»СЋР±РѕР№ С„РѕСЂРјР°С‚)
+        input_reffer_dir - РїР°РїРєР° СЃ Р°СѓРґРёРѕ С†РµР»РµРІС‹С… СЃРїРёРєРµСЂРѕРІ(Р»СЋР±РѕР№ С„РѕСЂРјР°С‚)
+        temp_dir - РІСЂРµРјРµРЅРЅР°СЏ РґРёСЂРµРєС‚РѕСЂРёСЏ РґР»СЏ СЂР°Р±РѕС‚С‹, РІ СЌС‚РѕР№ РґРёСЂРµРєС‚РѕСЂРёРё СЃРѕР·РґР°СЋСЃСЏ РїСЂРѕРјРµР¶СѓС‚РѕС‡РЅС‹Рµ С„Р°Р№Р»С‹
+        output_dir - РїР°РїРєР° РґР»СЏ РІС‹С…РѕРґРЅС‹С… РјРѕРґРµР»РµР№
+        training_hyper_params - РіРёРїРµСЂРїР°СЂР°РјРµС‚СЂС‹ С‚СЂРµРЅРёСЂРѕРІРєРё, СЃРј. VOXNOTModelTrainingHyperParams
+        training_env - РїР°СЂР°РјРµС‚СЂС‹ РѕРєСЂСѓР¶РµРЅРёСЏ С‚СЂРµРЅРёСЂРѕРІРєРё, СЃРј. VOXNOTModelTrainingEnvironment
+        training_name - РЅР°Р·РІР°РЅРёРµ РјРѕРґРµР»Рё, С‚Р°Рє Р±СѓРґРµС‚ РЅР°Р·С‹РІР°С‚СЊСЃСЏ С„Р°Р№Р» СЃ РїРѕСЃС‡РёС‚Р°РЅРЅС‹РјРё РІРµСЃР°РјРё, РєРѕС‚РѕСЂС‹Р№ Р±СѓРґРµС‚ СЃРѕС…СЂР°РЅРµРЅ РІ output_dir
         """
 
         dataset_X = self._prepare_dataset(delete_last_prepared_data, input_query_dir, os.path.join(temp_dir, "input_ds_X"))
@@ -129,10 +138,10 @@ class VOXNOT:
 
     def make_conversation(self, query_path:str | os.PathLike, trained_model_path:str | os.PathLike, out_path:str | os.PathLike):
         """
-        Метод конвертации речи
-        query_path - Папка или путь к файлу с аудио для конвертации
-        trained_model_path - Папка или путь к модели/коэффициентам, которые были получены после тренировки
-        out_path - Папка куда положить результат, wav файлы с результатом
+        РњРµС‚РѕРґ РєРѕРЅРІРµСЂС‚Р°С†РёРё СЂРµС‡Рё РїРѕ Р·Р°РїСЂРѕСЃСѓ РІ СЂРµС‡СЊ РіРѕР»РѕСЃРѕРј С†РµР»РµРІРѕРіРѕ СЃРїРёРєРµСЂР°
+        query_path - РџР°РїРєР° РёР»Рё РїСѓС‚СЊ Рє С„Р°Р№Р»Сѓ СЃ Р°СѓРґРёРѕ РґР»СЏ РєРѕРЅРІРµСЂС‚Р°С†РёРё
+        trained_model_path - РџР°РїРєР° РёР»Рё РїСѓС‚СЊ Рє С„Р°Р№Р»Сѓ СЃ РїРѕСЃС‡РёС‚Р°РЅРЅРѕР№ РјРѕРґРµР»СЊСЋ(РІРµСЃР°РјРё), С„Р°Р№Р»С‹ РєРѕС‚РѕСЂС‹Рµ РїРѕСЏРІР»СЏСЋС‚СЃСЏ РІ СЂРµР·СѓР»СЊС‚Р°С‚Рµ СЂР°Р±РѕС‚С‹ РјРµС‚РѕРґР° "train"
+        out_path - РџР°РїРєР° РєСѓРґР° РїРѕР»РѕР¶РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚, wav С„Р°Р№Р»С‹ СЃ СЂРµР·СѓР»СЊС‚Р°С‚РѕРј
         """        
         query_file_list = self._get_files(query_path)
         model_file_list = self._get_files(trained_model_path)
