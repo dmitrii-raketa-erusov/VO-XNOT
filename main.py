@@ -1,41 +1,64 @@
+п»ї# --------------------------------------------------------
+# VOXNOT(other name XNOT-VC): 
+# Github source: https://github.com/dmitrii-raketa-erusov/XNOT-VC
+# Copyright (c) 2024 Dmitrii Erusov
+# Licensed under The MIT License [see LICENSE for details]
+# Based on code bases
+# https://github.com/pytorch/
+# --------------------------------------------------------
 
 import torch
 from sources.params import VOXNOTModelHyperParams, VOXNOTModelTrainingEnvironment, VOXNOTModelTrainingHyperParams
 from sources.VOXNOT import VOXNOT
 
-# Пример использования в работе конвертация речи
+# РџСЂРёРјРµСЂ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РІ СЂР°Р±РѕС‚Рµ РєРѕРЅРІРµСЂС‚Р°С†РёСЏ СЂРµС‡Рё
+# РљРѕРЅРІРµСЂС‚Р°С†РёСЏ Р·РІСѓРєРѕРІС‹С… С„Р°Р№Р»РѕРІ СЃ СЂРµС‡СЊСЋ РЅР° РѕР±СѓС‡РµРЅРЅС‹С… РјРѕРґРµР»СЏС…
 def main_vc():
+    # Р§РёСЃС‚РёРј РїР°РјСЏС‚СЊ
     VOXNOT.clear_mem()
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Гипер-параметры модели
-    model_hp = VOXNOTModelHyperParams(layers = 4, layer_size = 2048)
-    # Конвертация звуковых файлов с речью на обученных моделях
+    # Р“РёРїРµСЂ-РїР°СЂР°РјРµС‚СЂС‹ РјРѕРґРµР»Рё
+    model_hp = VOXNOTModelHyperParams(layers = 4, layer_size = 1024)
+    # РСЃРїРѕР»СЊР·СѓРµРј РїСЂРѕСЃС‚СѓСЋ РјРѕРґРµР»СЊ MLP, 
     vx_prod = VOXNOT(device, 'VOXNOTMLPModel', model_hp, True)
     
-    # Получение речи 
-    vx_prod.make_conversation('Папка или путь к файлу с аудио для конвертации', 'Папка или путь к модели/коэффициентам', 'Папка куда положить результат')
+    # РљРѕРЅРІРµСЂСЃРёСЏ СЂРµС‡Рё РёР· С„Р°Р№Р»РѕРІ РІ РїР°РїРєРµ /content/query 
+    # РІ С†РµР»РµРІСѓСЋ СЂРµС‡СЊ РїРѕ РѕР±СѓС‡РµРЅРЅРѕР№ РјРѕРґРµР»Рё, С„Р°Р№Р»С‹ СЃ С†РµР»РµРІРѕР№ СЂРµС‡СЊ РїРѕР»РѕР¶РёС‚СЊ РІ РїР°РїРєСѓ /content/out
+    vx_prod.make_conversation('/content/query', '/models/СЂРµС‡СЊ_Р»СЏРіСѓС€РєРё.pt', '/content/out')
 
-# Пример использования Тренировки моделй
+    # РљРѕРЅРІРµСЂСЃРёСЏ СЂРµС‡Рё РёР· С„Р°Р№Р»Р° /content/new query.mp3 
+    # РІ С†РµР»РµРІСѓСЋ СЂРµС‡СЊ РїРѕ РѕР±СѓС‡РµРЅРЅРѕР№ РјРѕРґРµР»Рё, С†РµР»РµРІРѕР№ С„Р°Р№Р» /content/out_file.wav
+    vx_prod.make_conversation('/content/query', '/models/РјСѓР¶РёРє_РёР·_СЋС‚СѓР±.pt', '/content/out_file.wav')
+
+# РџСЂРёРјРµСЂ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РўСЂРµРЅРёСЂРѕРІРєРё РјРѕРґРµР»РµР№
 def main_train():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+    # Р§РёСЃС‚РёРј РїР°РјСЏС‚СЊ
     VOXNOT.clear_mem()
 
-    # Указываем параметры окружения для тренировки(пути, как логировать)
-    environment = VOXNOTModelTrainingEnvironment('путь для хранения лучших моделей', 0, 'путь для сохранения chekpoints', 5000, True, 500)
+    # РЈРєР°Р·С‹РІР°РµРј РїР°СЂР°РјРµС‚СЂС‹ РѕРєСЂСѓР¶РµРЅРёСЏ РґР»СЏ С‚СЂРµРЅРёСЂРѕРІРєРё(РїСѓС‚Рё, РєР°Рє Р»РѕРіРёСЂРѕРІР°С‚СЊ)
+    environment = VOXNOTModelTrainingEnvironment('РїСѓС‚СЊ РґР»СЏ С…СЂР°РЅРµРЅРёСЏ Р»СѓС‡С€РёС… РјРѕРґРµР»РµР№', 0, 'РїСѓС‚СЊ РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ chekpoints', 5000, True, 500)
     
-    # Гипер-параметры модели
-    model_hp = VOXNOTModelHyperParams(layers = 4, layer_size = 2048)
-
+    # Р“РёРїРµСЂ-РїР°СЂР°РјРµС‚СЂС‹ РјРѕРґРµР»Рё
+    model_hp = VOXNOTModelHyperParams(layers = 4, layer_size = 1024)
+    
+    # РЎРѕР·РґР°РµРј РјРѕРґРµР»СЊ РІ СЂРµР¶РёРјРµ С‚СЂРµРЅРёСЂРѕРІРєРё, РїР°СЂР°РјРµС‚СЂ prod_mode = False
     vx = VOXNOT(device, 'VOXNOTMLPModel', model_hp, False)
     
-    # Тренировки с разными W
-    vx.train(True, 'Путь к папке с аудио исходных спикеров', 'Папка с аудио целевого спикера', 'Временная папка для работы', 
-             'Папка куда положить лучшую модель', VOXNOTModelTrainingHyperParams(W = 1), environment, "Модель_W1")
+    # РўСЂРµРЅРёСЂРѕРІРєРё СЃ СЂР°Р·РЅС‹РјРё W Рё СЂР°Р·РЅС‹РјРё С†РµР»РµРІС‹РјРё СЃРїРёРєРµСЂР°РјРё РЅР° РєРѕРЅРІРµСЂС‚Р°С†РёСЋ СЃРІРѕРµРіРѕ РіРѕР»РѕСЃР° РІ РіРѕР»РѕСЃР° С†РµР»РµРІС‹С… СЃРїРёРєРµСЂРѕРІ
     
-    # VOXNOTModelTrainingHyperParams(W = 2) - указываем гипер параметр W для тренировки = 2
-    vx.train(False, '', ..., VOXNOTModelTrainingHyperParams(W = 2), environment, "Модель_W2")
-    vx.train(False, '', ..., VOXNOTModelTrainingHyperParams(W = 4), environment, "Модель_W4")
-    vx.train(False, '', ..., VOXNOTModelTrainingHyperParams(W = 8), environment, "Модель_W8")
+    # W = 8, С†РµР»РµРІРѕР№ СЃРїРёРєРµСЂ "РјСѓР¶РёРє СЃ СЋС‚СѓР±Р°"
+    vx.train(True, '/content/my_voice.mp3', '/content/РјСѓР¶РёРє.m4a', '/content/tmp', 
+             '/content/models', VOXNOTModelTrainingHyperParams(W = 8), environment, "РјСѓР¶РёРє СЃ СЋС‚СѓР±Р°_W8")
+    
+    # W = 12, С†РµР»РµРІРѕР№ СЃРїРёРєРµСЂ "РјСѓР¶РёРє СЃ СЋС‚СѓР±Р°", РїРµСЂРµРґР°РµРј FALSE, С‚Р°Рє РєР°Рє Р·Р°РЅРѕРІРѕ РіРѕС‚РѕРІРёС‚СЊ dataset РЅРµ РЅСѓР¶РЅРѕ
+    vx.train(False, '/content/my_voice.mp3', '/content/РјСѓР¶РёРє.m4a', '/content/tmp', 
+             '/content/models', VOXNOTModelTrainingHyperParams(W = 12), environment, "РјСѓР¶РёРє СЃ СЋС‚СѓР±Р°_W12")
+
+    # W = 12, С†РµР»РµРІРѕР№ СЃРїРёРєРµСЂ "РєСЂРѕРєРѕРґРёР» Р“РµРЅР°", РїРµСЂРµРґР°РµРј 1С‹Р№ РїР°СЂР°РјРµС‚СЂ TRUE, С‚Р°Рє РєР°Рє РЅСѓР¶РµРЅ РЅРѕРІС‹Р№ dataset, РІС…РѕРґРЅРѕР№ С„Р°Р№Р» С†РµР»РµРІРѕРіРѕ СЃРїРёРєРµСЂР° РґСЂСѓРіРѕР№
+    vx.train(True, '/content/my_voice.mp3', '/content/gena_samples/', '/content/tmp', 
+             'РџР°РїРєР° РєСѓРґР° РїРѕР»РѕР¶РёС‚СЊ Р»СѓС‡С€СѓСЋ РјРѕРґРµР»СЊ', VOXNOTModelTrainingHyperParams(W = 12), environment, "РєСЂРѕРєРѕРґРёР» Р“РµРЅР°")
+
 
